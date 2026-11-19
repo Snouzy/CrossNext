@@ -111,7 +111,9 @@ class ClipSelectionActivity final : public Activity {
   uint8_t currentPageOffset = 0;
   uint16_t rowCount = 0;
   bool touchDragSelecting = false;
-  bool ignoreInitialTouch = false;
+  // The drag follows the finger whose long-press opened the selection; the
+  // reader swallowed that contact, so it is read through isLongPressTouchHeld.
+  bool followLongPressTouch = false;
   int dragOffsetX = 0;
   int dragOffsetY = 0;
   bool touchDragHasMoved = false;

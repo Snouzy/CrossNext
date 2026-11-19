@@ -162,6 +162,9 @@ class MappedInputManager {
   // also arrive as a tap. The SDK self-clears once the contact ends.
   void swallowCurrentTouch() const;
   bool isScreenTouchHeld(int& x, int& y) const;
+  // Like isScreenTouchHeld, but also follows a contact that a long-press
+  // swallowed, so the screen it opened can keep tracking the same finger.
+  bool isLongPressTouchHeld(int& x, int& y) const;
   // Raw release edge, also true when the contact ended in a swipe or drag-off
   // (which wasScreenTapped never reports). InputSnapshot builders forward it
   // off-target so FreeInkUI routing clears its pressed-element state.

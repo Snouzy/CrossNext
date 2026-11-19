@@ -92,7 +92,14 @@ void ClipSelectionActivity::onEnter() {
       return;
     }
     selected = rangeStart = hit;
-    ignoreInitialTouch = true;
+    // The finger that long-pressed is still down: let it drag the end of the
+    // selection straight away, as on Android, instead of lifting to grab a handle.
+    touchDragSelecting = followLongPressTouch = true;
+    touchDragHasMoved = false;
+    touchDragStartX = initialX;
+    touchDragStartY = initialY;
+    dragOffsetX = dragOffsetY = 0;
+    touchDragPageEndIndex = -1;
   }
   requestUpdate();
 }
@@ -518,10 +525,6 @@ void ClipSelectionActivity::loop() {
 
   int touchX = 0;
   int touchY = 0;
-  if (ignoreInitialTouch) {
-    if (!mappedInput.isScreenTouchHeld(touchX, touchY)) ignoreInitialTouch = false;
-    return;
-  }
   if (!touchDragSelecting && mappedInput.wasScreenTapped(touchX, touchY)) {
     if (rangeStart >= 0) {
       const int action = selectionGeometry::actionAt(actionRect(), UITheme::getInstance().getMetrics().menuSpacing,
@@ -549,7 +552,9 @@ void ClipSelectionActivity::loop() {
     return;
   }
   if (touchDragSelecting) {
-    if (mappedInput.isScreenTouchHeld(touchX, touchY)) {
+    const bool held = followLongPressTouch ? mappedInput.isLongPressTouchHeld(touchX, touchY)
+                                           : mappedInput.isScreenTouchHeld(touchX, touchY);
+    if (held) {
       const int deltaX = touchX - touchDragStartX;
       const int deltaY = touchY - touchDragStartY;
       touchDragHasMoved = touchDragHasMoved || deltaX >= TOUCH_DRAG_MOVEMENT_PX || deltaX <= -TOUCH_DRAG_MOVEMENT_PX ||
@@ -578,7 +583,7 @@ void ClipSelectionActivity::loop() {
       }
       return;
     }
-    touchDragSelecting = false;
+    touchDragSelecting = followLongPressTouch = false;
     touchDragHasMoved = false;
     touchDragPageEndIndex = -1;
     requestUpdate();

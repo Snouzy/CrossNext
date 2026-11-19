@@ -238,6 +238,11 @@ bool HalGPIO::isTouchHeldAt(float& nx, float& ny) const {
   return inputMgr.isTouchHeldAt(nx, ny);
 }
 
+bool HalGPIO::isSuppressedTouchHeldAt(float& nx, float& ny) const {
+  DEV_INPUT(devinput::isTouchHeldAt(nx, ny))
+  return inputMgr.isSuppressedTouchHeldAt(nx, ny);
+}
+
 bool HalGPIO::wasTouchLongPress(float& nx, float& ny) const {
   DEV_INPUT(devinput::wasTouchLongPress(nx, ny))
   return inputMgr.wasTouchLongPress(nx, ny);

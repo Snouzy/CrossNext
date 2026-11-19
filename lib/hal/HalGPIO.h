@@ -115,6 +115,9 @@ class HalGPIO {
   bool wasTouchReleased() const;
   bool isTouchTapCandidate(float& nx, float& ny, unsigned long& heldMs) const;
   bool isTouchHeldAt(float& nx, float& ny) const;
+  // Live position even after suppressTouchContact(): lets the screen opened by
+  // a long-press follow that same finger; the release still taps nothing.
+  bool isSuppressedTouchHeldAt(float& nx, float& ny) const;
   // One-shot long-press, fired by the SDK classifier while the finger is still
   // down (stationary contact held past its threshold). Position = touch-down
   // point. Callers that act on it should suppressTouchContact() so the lift

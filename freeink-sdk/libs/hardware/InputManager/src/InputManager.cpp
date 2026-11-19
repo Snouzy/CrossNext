@@ -774,6 +774,18 @@ bool InputManager::isTouchHeldAt(float& nx, float& ny) const {
 #endif
 }
 
+bool InputManager::isSuppressedTouchHeldAt(float& nx, float& ny) const {
+#if FREEINK_CAP_TOUCH
+  if (!touchPressed || touchMultiContactSequence) return false;
+  normalizeTouchPoint(touchUpPoint.x, touchUpPoint.y, nx, ny);
+  return true;
+#else
+  (void)nx;
+  (void)ny;
+  return false;
+#endif
+}
+
 unsigned long InputManager::lastTouchHeldMs() const {
 #if FREEINK_CAP_TOUCH
   return lastTouchHeldDurationMs;

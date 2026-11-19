@@ -151,6 +151,10 @@ class InputManager {
   // no tap-slop gate — the position follows the moving finger, for drag
   // interactions (sliders). Callers own any threshold/hysteresis they need.
   bool isTouchHeldAt(float& nx, float& ny) const;
+  // Same live position, but also for a contact that #suppressTouchContact
+  // muted: the screen opened by a long-press can keep following that finger
+  // (drag-select after long-press) while its release still yields no tap or swipe.
+  bool isSuppressedTouchHeldAt(float& nx, float& ny) const;
   // Duration (ms) of the last touch contact, latched on release.
   unsigned long lastTouchHeldMs() const;
   // Swipe gesture on release. Returns start/end positions normalized in the
