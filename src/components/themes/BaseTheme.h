@@ -289,7 +289,8 @@ class BaseTheme {
                               const std::function<UIIcon(int index)>& rowIcon, int rowSpacing = -1,
                               int rowHeight = -1) const;
   static void drawSelectionHandle(const GfxRenderer& renderer, Rect rect, bool left);
-  static void drawSelectionActions(const GfxRenderer& renderer, Rect rect, bool singleWord);
+  // One or two buttons from {Translate, Define, Save quote}, starting at firstAction.
+  static void drawSelectionActions(const GfxRenderer& renderer, Rect rect, int firstAction);
   virtual Rect drawPopup(const GfxRenderer& renderer, const char* message) const;
   Rect drawLoadingScreen(const GfxRenderer& renderer, const char* message) const;
   virtual void fillPopupProgress(const GfxRenderer& renderer, const Rect& layout, const int progress) const;

@@ -14,7 +14,7 @@ clean_word = "const char* cleanWordStart" + source.split("const char* cleanWordS
 )[0]
 build_text = "bool ClipSelectionActivity::buildSelectedText" + source.split(
     "bool ClipSelectionActivity::buildSelectedText", 1
-)[1].split("int ClipSelectionActivity::selectionActionCount", 1)[0]
+)[1].split("ClipSelectionActivity::SelectionKind ClipSelectionActivity::selectionKind", 1)[0]
 memory_guard = "  const auto heap = HalMemory::getDefaultHeap();" + source.split(
     "  const auto heap = HalMemory::getDefaultHeap();", 1
 )[1].split("  if (lowMemory ||", 1)[0]
@@ -32,7 +32,7 @@ word_rect = method("Rect clippingWordRect", "int clampPercent", reader_source)
 saved_hit = method("int EpubReaderActivity::clippingAtPoint", "void EpubReaderActivity::drawClippingHighlights", reader_source)
 saved_draw = method("void EpubReaderActivity::drawClippingHighlights", "void EpubReaderActivity::renderStatusBar", reader_source)
 
-selection_policy = method("int ClipSelectionActivity::selectionActionCount", "ClippingResult::Action ClipSelectionActivity::selectionAction")
+selection_policy = method("ClipSelectionActivity::SelectionKind ClipSelectionActivity::selectionKind", "ClippingResult::Action ClipSelectionActivity::selectionAction")
 
 # Compile production extraction, export, and redraws with bounded UI/rendering stubs.
 harness = r"""
@@ -113,7 +113,7 @@ struct Renderer {
 };
 struct Theme {
   void drawSelectionHandle(const Renderer&, Rect, bool) const {}
-  void drawSelectionActions(const Renderer&, Rect, bool) const {}
+  void drawSelectionActions(const Renderer&, Rect, int) const {}
 } GUI;
 struct Input { bool hasTouch() const { return false; } };
 using GfxRenderer = Renderer;
@@ -164,7 +164,9 @@ struct ClipSelectionActivity {
   int selected = 0, rangeStart = -1, currentPageOffset = 0;
   bool touchDragSelecting = false;
   bool buildSelectedText(int first, int last, std::string& text) const;
-  int selectionActionCount() const;
+  enum class SelectionKind : uint8_t { Word, Phrase, Passage };
+  static constexpr int MAX_LOOKUP_PHRASE_WORDS = 6;
+  SelectionKind selectionKind() const;
   bool extractWords();
   void drawWordClean(int, int, int) const;
   void drawWordHighlight(int, int, int, int, int) const;
@@ -299,7 +301,7 @@ int main() {
   loadLine(activity, ltr, false);
   expect(activity, 0, 3, "alpha אחד שני beta");
   activity.rangeStart = 1; activity.selected = 2;
-  assert(activity.selectionActionCount() == 1);
+  assert(activity.selectionKind() == ClipSelectionActivity::SelectionKind::Phrase);
   const std::vector<std::string> firstLine{"אחד", "alpha", "beta", "שני"};
   const std::vector<std::string> secondLine{"واحد", "gamma", "delta", "اثنان"};
   loadLine(activity, firstLine, true);
@@ -322,7 +324,7 @@ int main() {
   activity.words[0].discretionaryHyphen = true;
   expect(activity, 0, 1, "discretionary");
   activity.rangeStart = 0; activity.selected = 1;
-  assert(activity.selectionActionCount() == 2);
+  assert(activity.selectionKind() == ClipSelectionActivity::SelectionKind::Word);
   activity.words[0].text = "Café";
   activity.words[0].endOffset = 5;
   activity.words[0].discretionaryHyphen = false;

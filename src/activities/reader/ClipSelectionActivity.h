@@ -69,7 +69,14 @@ class ClipSelectionActivity final : public Activity {
   bool handleButtons(uint8_t buttons);
   Rect handleRect(int index, bool start) const;
   Rect actionRect() const;
-  int selectionActionCount() const;
+  // Buttons offered for the current selection, as a window over
+  // {Translate, Define, Save quote} starting at the kind's index: one word gets
+  // Translate + Define, a short phrase inside one paragraph (a name, "pomme de
+  // terre") Define + Save quote, anything longer Save quote only.
+  enum class SelectionKind : uint8_t { Word, Phrase, Passage };
+  static constexpr int MAX_LOOKUP_PHRASE_WORDS = 6;
+  SelectionKind selectionKind() const;
+  int selectionActionCount() const { return selectionKind() == SelectionKind::Passage ? 1 : 2; }
   ClippingResult::Action selectionAction(int index) const;
   int selectionTop() const;
   int textOffset() const;

@@ -1028,15 +1028,16 @@ void BaseTheme::drawSelectionHandle(const GfxRenderer& renderer, const Rect rect
   renderer.fillRect(left ? rect.x + radius : rect.x, rect.y, radius, radius);
 }
 
-void BaseTheme::drawSelectionActions(const GfxRenderer& renderer, const Rect rect, const bool singleWord) {
+void BaseTheme::drawSelectionActions(const GfxRenderer& renderer, const Rect rect, const int firstAction) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const char* labels[] = {tr(STR_WORD_TRANSLATE), tr(STR_WORD_DEFINE), tr(STR_WORD_QUOTE)};
-  const int count = singleWord ? 2 : 1;
+  const int first = std::clamp(firstAction, 0, 2);
+  const int count = first == 2 ? 1 : 2;
   for (int i = 0; i < count; ++i) {
     const Rect button = selectionGeometry::button(rect, i, metrics.menuSpacing, count);
     renderer.fillRoundedRect(button.x, button.y, button.width, button.height, metrics.controlRadius, Color::White);
     renderer.drawRoundedRect(button.x, button.y, button.width, button.height, 1, metrics.controlRadius, true);
-    UITheme::drawCenteredWrappedText(renderer, button, uiScaleSpec().smallFontId, labels[singleWord ? i : 2], 2, true,
+    UITheme::drawCenteredWrappedText(renderer, button, uiScaleSpec().smallFontId, labels[first + i], 2, true,
                                      EpdFontFamily::REGULAR, UITheme::TextVerticalAlignment::CENTER);
   }
 }

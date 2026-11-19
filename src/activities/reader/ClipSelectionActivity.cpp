@@ -38,6 +38,11 @@ constexpr int TOUCH_DRAG_MOVEMENT_PX = 4;
 constexpr uint8_t TOUCH_DRAG_REFRESH_FRAMES = 6;
 constexpr unsigned long TOUCH_PAGE_ADVANCE_HOLD_MS = 1000;
 constexpr int TOUCH_PAGE_END_DWELL_SLOP_PX = 8;
+// Indexed by SelectionKind, which picks a window of one or two buttons; the
+// order matches BaseTheme::drawSelectionActions.
+constexpr ClippingResult::Action SELECTION_ACTIONS[] = {ClippingResult::Action::Translate,
+                                                        ClippingResult::Action::Lookup, ClippingResult::Action::Clip};
+constexpr StrId SELECTION_LABELS[] = {StrId::STR_WORD_TRANSLATE, StrId::STR_WORD_DEFINE, StrId::STR_WORD_QUOTE};
 
 const char* cleanWordStart(const char* text) {
   if (!text) return "";
@@ -358,9 +363,13 @@ bool ClipSelectionActivity::buildSelectedText(const int first, const int last, s
   return true;
 }
 
-int ClipSelectionActivity::selectionActionCount() const {
-  if (rangeStart < 0) return 2;
+ClipSelectionActivity::SelectionKind ClipSelectionActivity::selectionKind() const {
+  if (rangeStart < 0) return SelectionKind::Word;
   const int first = std::min(rangeStart, selected), last = std::max(rangeStart, selected);
+  // Several words can still be one dictionary headword when they stay short and
+  // inside one paragraph; callers return Passage first for a paragraph break.
+  const SelectionKind severalWords =
+      last - first < MAX_LOOKUP_PHRASE_WORDS ? SelectionKind::Phrase : SelectionKind::Passage;
   uint32_t start = UINT32_MAX, end = 0;
   bool sourceKnown = true;
   for (int n = first; n <= last; ++n) {
@@ -374,7 +383,7 @@ int ClipSelectionActivity::selectionActionCount() const {
   }
   if (sourceKnown) {
     for (int n = first; n <= last; ++n)
-      if (words[n].paragraphStart && words[n].startOffset != start) return 1;
+      if (words[n].paragraphStart && words[n].startOffset != start) return SelectionKind::Passage;
     // Bidi may reverse fragments. Grow source coverage without allocating a sort buffer.
     uint32_t through = start;
     for (int step = first; step <= last; ++step) {
@@ -384,22 +393,23 @@ int ClipSelectionActivity::selectionActionCount() const {
       if (next == through) break;
       through = next;
     }
-    return through == end ? 2 : 1;
+    return through == end ? SelectionKind::Word : severalWords;
   }
+  bool separatedWords = false;
   for (int n = first + 1; n <= last; ++n) {
     const auto& previous = words[n - 1];
     const auto& current = words[n];
-    const bool separated = current.row != previous.row ? !previous.discretionaryHyphen && !current.discretionaryHyphen
-                                                       : current.x > previous.x + previous.width + 2 ||
-                                                             previous.x > current.x + current.width + 2;
-    if (current.paragraphStart || separated) return 1;
+    if (current.paragraphStart) return SelectionKind::Passage;
+    separatedWords = separatedWords ||
+                     (current.row != previous.row ? !previous.discretionaryHyphen && !current.discretionaryHyphen
+                                                  : current.x > previous.x + previous.width + 2 ||
+                                                        previous.x > current.x + current.width + 2);
   }
-  return 2;
+  return separatedWords ? severalWords : SelectionKind::Word;
 }
 
 ClippingResult::Action ClipSelectionActivity::selectionAction(const int index) const {
-  if (selectionActionCount() == 1) return ClippingResult::Action::Clip;
-  return index == 0 ? ClippingResult::Action::Translate : ClippingResult::Action::Lookup;
+  return SELECTION_ACTIONS[static_cast<int>(selectionKind()) + index];
 }
 
 void ClipSelectionActivity::confirmSelection(const ClippingResult::Action action) {
@@ -411,7 +421,9 @@ void ClipSelectionActivity::confirmSelection(const ClippingResult::Action action
 
   const int first = std::min(rangeStart, selected);
   const int last = std::max(rangeStart, selected);
-  if ((selectionActionCount() == 1) != (action == ClippingResult::Action::Clip)) return;
+  bool offered = false;
+  for (int i = 0; i < selectionActionCount(); ++i) offered = offered || selectionAction(i) == action;
+  if (!offered) return;
   int before = first, after = last;
   if ((action == ClippingResult::Action::Lookup || action == ClippingResult::Action::Translate)) {
     while (before > 0 && !words[before].paragraphStart && !vocabulary::sentenceEnd(words[before - 1].text)) --before;
@@ -655,9 +667,8 @@ bool ClipSelectionActivity::handleButtons(const uint8_t buttons) {
       requestUpdate();
       return true;
     }
-    static constexpr StrId choices[] = {StrId::STR_WORD_TRANSLATE, StrId::STR_WORD_DEFINE, StrId::STR_WORD_QUOTE};
-    const int count = selectionActionCount();
-    actionPopup.show(StrId::STR_SELECT, count == 2 ? choices : choices + 2, count, 0, [this](int index) {
+    actionPopup.show(StrId::STR_SELECT, SELECTION_LABELS + static_cast<int>(selectionKind()), selectionActionCount(), 0,
+                     [this](int index) {
       if (index >= 0 && index < selectionActionCount()) confirmSelection(selectionAction(index));
     });
     requestUpdate();
@@ -710,9 +721,9 @@ Rect ClipSelectionActivity::actionRect() const {
   safe.height = bottomEdge - safe.y;
   const int font = uiScaleSpec().smallFontId;
   const int count = selectionActionCount();
-  const int labelWidth = count == 2 ? std::max(renderer.getTextWidth(font, tr(STR_WORD_TRANSLATE)),
-                                               renderer.getTextWidth(font, tr(STR_WORD_DEFINE)))
-                                    : renderer.getTextWidth(font, tr(STR_WORD_QUOTE));
+  const StrId* labels = SELECTION_LABELS + static_cast<int>(selectionKind());
+  int labelWidth = 0;
+  for (int i = 0; i < count; ++i) labelWidth = std::max(labelWidth, renderer.getTextWidth(font, I18N.get(labels[i])));
   const int padding = metrics.menuSpacing;
   const int width = std::min(safe.width, count * (labelWidth + padding * 2) + padding * (count + 1));
   const int lines = labelWidth > (width - padding * (count + 1)) / count ? 2 : 1;
@@ -967,7 +978,7 @@ void ClipSelectionActivity::drawSelection() const {
       GUI.drawSelectionHandle(renderer, handleRect(first, true), !words[first].isRtl);
     if (words[last].pageOffset == currentPageOffset)
       GUI.drawSelectionHandle(renderer, handleRect(last, false), words[last].isRtl);
-    if (!touchDragSelecting) GUI.drawSelectionActions(renderer, actionRect(), selectionActionCount() == 2);
+    if (!touchDragSelecting) GUI.drawSelectionActions(renderer, actionRect(), static_cast<int>(selectionKind()));
   } else {
     const auto cursor = lookupRect(words[selected]);
     renderer.drawRect(cursor.x + offsetX, cursor.y + offset, cursor.width, cursor.height, true);
