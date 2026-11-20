@@ -723,9 +723,11 @@ std::unique_ptr<TextBlock> TextBlock::deserialize(serialization::ReadBuffer& fil
     const auto* cursor = reinterpret_cast<const unsigned char*>(block->wordText(0));
     const auto* begin = cursor;
     const uint32_t cp = utf8NextCodepoint(&cursor);
-    if (!cp || cap.prefixBytes != cursor - begin || cap.prefixBytes > block->wordTextLen(0) || cap.fontId < 0 ||
-        cap.scale256 < 256 || cap.scale256 > 4096 || cap.inset <= 0 || cap.inset > 4096 || cap.baseline <= 0 ||
-        cap.baseline > 4096 || cap.height <= 0 || cap.height > 4096 || cap.style > EpdFontFamily::BOLD ||
+    // fontId is any int: reader and variant ids are 32-bit hashes, half of them
+    // negative, and renderFontId falls back to the section font for unknown ids.
+    if (!cp || cap.prefixBytes != cursor - begin || cap.prefixBytes > block->wordTextLen(0) || cap.scale256 < 256 ||
+        cap.scale256 > 4096 || cap.inset <= 0 || cap.inset > 4096 || cap.baseline <= 0 || cap.baseline > 4096 ||
+        cap.height <= 0 || cap.height > 4096 || cap.style > EpdFontFamily::BOLD ||
         (budget && !budget->claim(sizeof(DropCap))) || !block->setDropCap(cap)) {
       LOG_ERR("TXB", "Deserialization failed: invalid drop cap");
       return nullptr;

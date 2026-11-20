@@ -2290,6 +2290,40 @@ TEST(StyledPageCache, RejectsTruncatedDropCapsAndBorderBoxes) {
   std::filesystem::remove(path);
 }
 
+TEST(StyledPageCache, DropCapWithNegativeFontIdSurvivesTheCache) {
+  // Reader and variant font ids are 32-bit hashes cast to int, so about half
+  // of them are negative. A drop cap drawn in such a font must read back.
+  GfxRenderer renderer;
+  ParsedText text;
+  text.addWord("Imagination", EpdFontFamily::REGULAR);
+  std::unique_ptr<TextBlock> block;
+  text.layoutAndExtractLines(renderer, 0, 200, [&](auto line, uint32_t) { block = std::move(line); });
+  ASSERT_NE(block, nullptr);
+  TextBlock::DropCap cap;
+  cap.fontId = -1622438105;
+  cap.scale256 = 768;
+  cap.inset = 30;
+  cap.baseline = 40;
+  cap.height = 48;
+  cap.prefixBytes = 1;
+  ASSERT_TRUE(block->setDropCap(cap));
+  const auto path = (std::filesystem::temp_directory_path() / "styled-cache-negative-cap.bin").string();
+  {
+    HalFile output;
+    ASSERT_TRUE(output.open(path.c_str(), "wb"));
+    ASSERT_TRUE(block->serialize(output));
+  }
+  {
+    HalFile input;
+    ASSERT_TRUE(input.open(path.c_str(), "rb"));
+    auto restored = TextBlock::deserialize(input);
+    ASSERT_NE(restored, nullptr);
+    ASSERT_NE(restored->getDropCap(), nullptr);
+    EXPECT_EQ(restored->getDropCap()->fontId, cap.fontId);
+  }
+  std::filesystem::remove(path);
+}
+
 TEST(StyledPageCache, SpeculativeLoadAccountsForInlineFontStorage) {
   GfxRenderer renderer;
   ParsedText text;
