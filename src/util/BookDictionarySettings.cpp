@@ -116,7 +116,8 @@ bool save(const char* book, const Settings& settings) {
   // Only overwrite the inactive slot; an interrupted write leaves the previous
   // checksum-validated record readable. No replacing rename is needed.
   uint32_t writtenSequence = 0;
-  if (Storage.mkdir(ROOT) && writeSlot(book, settings, 1 - active, sequence + 1) &&
+  // SdFat's mkdir fails on an existing folder, so only create it when missing.
+  if ((Storage.exists(ROOT) || Storage.mkdir(ROOT)) && writeSlot(book, settings, 1 - active, sequence + 1) &&
       readSlot(book, 1 - active, previous, writtenSequence) && writtenSequence == sequence + 1 &&
       !std::memcmp(&previous, &settings, sizeof(settings)))
     return true;
